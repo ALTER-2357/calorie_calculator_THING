@@ -1,0 +1,3 @@
+Update AddMealView and EditMeal flows to allow creating meals that preserve per-entry protein/carbs display/editing.
+Add "fat" tracking or compute calories from macros when calories are missing.
+Add a camera barcode scanner to auto-fill barcodes.
