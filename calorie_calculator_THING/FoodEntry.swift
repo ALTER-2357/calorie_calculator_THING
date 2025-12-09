@@ -3,12 +3,12 @@ import SwiftData
 
 @Model
 final class FoodEntry: Identifiable {
-    // SwiftData will map simple stored properties. Keep them simple (String, Int, Double?, Date, etc).
     var id: UUID = UUID()
     var name: String
     var calories: Int
     var protein: Double?
     var carbs: Double?
+    var fat: Double?          // Added fat tracking (grams)
     var timestamp: Date
     var servingSize: String?
     var servings: Double?
@@ -23,6 +23,7 @@ final class FoodEntry: Identifiable {
         calories: Int,
         protein: Double? = nil,
         carbs: Double? = nil,
+        fat: Double? = nil,
         timestamp: Date = Date(),
         servingSize: String? = nil,
         servings: Double? = nil,
@@ -33,6 +34,7 @@ final class FoodEntry: Identifiable {
         self.calories = calories
         self.protein = protein
         self.carbs = carbs
+        self.fat = fat
         self.timestamp = timestamp
         self.servingSize = servingSize
         self.servings = servings

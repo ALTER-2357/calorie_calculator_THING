@@ -31,7 +31,11 @@ struct ContentView: View {
 
     // Settings persistent with AppStorage
     @AppStorage("dailyCalorieGoal") private var dailyCalorieGoal: Int = 2000
-    @AppStorage("compactLayout") private var compactLayout: Bool = false
+
+    // New macro goals (grams)
+    @AppStorage("dailyProteinGoal") private var dailyProteinGoal: Int = 100
+    @AppStorage("dailyCarbGoal") private var dailyCarbGoal: Int = 250
+    @AppStorage("dailyFatGoal") private var dailyFatGoal: Int = 70
 
     // Settings sheet
     @State private var showingSettings = false
@@ -56,6 +60,10 @@ struct ContentView: View {
         let calendar = Calendar.current
         return entries.filter { calendar.isDateInToday($0.timestamp) }.reduce(0.0) { $0 + ($1.carbs ?? 0.0) }
     }
+    private var totalFatToday: Double {
+        let calendar = Calendar.current
+        return entries.filter { calendar.isDateInToday($0.timestamp) }.reduce(0.0) { $0 + ($1.fat ?? 0.0) }
+    }
 
     private var totalCaloriesAllTime: Int {
         entries.reduce(0) { $0 + $1.calories }
@@ -66,6 +74,10 @@ struct ContentView: View {
     private var totalCarbsAllTime: Double {
         entries.reduce(0.0) { $0 + ($1.carbs ?? 0.0) }
     }
+    // Added totalFatAllTime
+    private var totalFatAllTime: Double {
+        entries.reduce(0.0) { $0 + ($1.fat ?? 0.0) }
+    }
 
     // Helper to format doubles consistently and avoid interpolation quoting issues
     private func fmt(_ value: Double, decimals: Int = 1) -> String {
@@ -74,7 +86,7 @@ struct ContentView: View {
 
     // Precompute the "All time" text
     private var allTimeText: String {
-        "\(totalCaloriesAllTime) kcal • \(fmt(totalProteinAllTime)) g protein • \(fmt(totalCarbsAllTime)) g carbs"
+        "\(totalCaloriesAllTime) kcal • \(fmt(totalProteinAllTime)) g protein • \(fmt(totalCarbsAllTime)) g carbs • \(fmt(totalFatAllTime)) g fat"
     }
 
     // Group entries by start of day, sorted descending by day
@@ -107,8 +119,12 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            // Sidebar: mode picker + search + header card + content
-            VStack(spacing: compactLayout ? 8 : 12) {
+            // Sidebar: top spacing and inline search
+            VStack() {
+                // Inline search field placed at the very top of the content so it sits close under the toolbar.
+                inlineSearchField
+                    .padding(.horizontal, 16)
+
                 // Mode picker
                 Picker("Mode", selection: $viewMode) {
                     ForEach(ViewMode.allCases) { mode in
@@ -116,11 +132,11 @@ struct ContentView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, compactLayout ? 8 : 16)
+                .padding(.horizontal, 16)
 
-                // Compact totals card with progress
+                // Totals card with progress
                 totalsCard
-                    .padding(.horizontal, compactLayout ? 8 : 16)
+                    .padding(.horizontal, 16)
 
                 // Content lists
                 if viewMode == .entries {
@@ -128,14 +144,14 @@ struct ContentView: View {
                 } else {
                     mealsList
                 }
-
-                Spacer(minLength: 8)
             }
 #if os(macOS)
-            .navigationSplitViewColumnWidth(min: 240, ideal: compactLayout ? 280 : 340)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 340)
 #endif
             .toolbar {
-                // Left: hamburger -> quick meal actions
+                // Combined Menu + larger toolbar controls
+                #if os(macOS)
+                // Single combined menu on the leading side with a larger control size
                 ToolbarItem(placement: .navigationBarLeading) {
                     Menu {
                         if meals.isEmpty {
@@ -153,7 +169,6 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        Divider()
                         Button {
                             addMealPrefillIDs = []
                             mealToEdit = nil
@@ -161,35 +176,54 @@ struct ContentView: View {
                         } label: {
                             Label("New Meal", systemImage: "plus.rectangle.on.rectangle")
                         }
+
+                        Divider()
+
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                     } label: {
-                        Image(systemName: "line.horizontal.3")
+                        Label("Menu", systemImage: "line.horizontal.3")
+                            .labelStyle(.iconOnly)
                             .imageScale(.large)
-                            .help("Meals & quick actions")
                     }
+                    .controlSize(.large)
+                    .help("Meals, quick actions & settings")
                 }
 
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-
-                // Settings button
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .help("Settings")
-                }
-
-                // Add entry primary action
+                // Add entry primary action (more prominent)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddEntry = true }) {
                         Label("Add Entry", systemImage: "plus")
                     }
+                    .controlSize(.large)
                 }
+                #else
+                // On iOS / Catalyst show a bottom bar toolbar with combined menu and larger font
+                ToolbarItem(placement: .bottomBar) {
+                    Menu {
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                    } label: {
+                        Label("Menu", systemImage: "line.horizontal.3")
+                            .imageScale(.large)
+                    }
+                    .font(.title3)
+                    .help("Meals, quick actions & settings")
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button(action: { showingAddEntry = true }) {
+                        Label("Add Entry", systemImage: "plus")
+                    }
+                    .font(.title3)
+                }
+                #endif
             }
             // Add/edit meal sheet
             .sheet(isPresented: $showingAddMeal) {
@@ -203,14 +237,15 @@ struct ContentView: View {
                     mealToEdit = nil
                 }
             }
-            // Add entry sheet
+            // Add entry sheet (updated to include fat in closure)
             .sheet(isPresented: $showingAddEntry) {
-                AddEntryView { name, calories, protein, carbs, date, servingSize, servings, barcode in
+                AddEntryView { name, calories, protein, carbs, fat, date, servingSize, servings, barcode in
                     addEntry(
                         name: name,
                         calories: calories,
                         protein: protein,
                         carbs: carbs,
+                        fat: fat,
                         date: date,
                         servingSize: servingSize,
                         servings: servings,
@@ -243,12 +278,13 @@ struct ContentView: View {
                     Text("Are you sure?")
                 }
             }
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search entries and meals")
             // Settings sheet
             .sheet(isPresented: $showingSettings) {
                 SettingsView(
                     dailyCalorieGoal: $dailyCalorieGoal,
-                    compactLayout: $compactLayout
+                    dailyProteinGoal: $dailyProteinGoal,
+                    dailyCarbGoal: $dailyCarbGoal,
+                    dailyFatGoal: $dailyFatGoal
                 )
             }
         } detail: {
@@ -274,48 +310,67 @@ struct ContentView: View {
         }
     }
 
+    // Inline search field placed at the top of the sidebar so it sits closely under the toolbar.
+    private var inlineSearchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField("Search entries and meals", text: $searchText)
+                .autocorrectionDisabled(true)
+                .textInputAutocapitalization(.never)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.06)))
+    }
+
     // MARK: - Subviews: Totals Card
 
     private var totalsCard: some View {
-        VStack(spacing: compactLayout ? 6 : 10) {
+        VStack(spacing: 10) {
             HStack {
-                VStack(alignment: .leading, spacing: compactLayout ? 4 : 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Today")
-                        .font(compactLayout ? .caption2 : .caption)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("\(totalCaloriesToday) kcal")
-                        .font(compactLayout ? .headline : .title2)
+                        .font(.title2)
                         .bold()
-                    if !compactLayout {
-                        Text("Calories")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("Calories")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                VStack(alignment: .leading, spacing: compactLayout ? 4 : 6) {
-                    Text("\(fmt(totalProteinToday)) g")
-                        .font(compactLayout ? .headline : .title2)
-                        .bold()
-                    if !compactLayout {
-                        Text("Protein")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading, spacing: compactLayout ? 4 : 6) {
-                    Text("\(fmt(totalCarbsToday)) g")
-                        .font(compactLayout ? .headline : .title2)
-                        .bold()
-                    if !compactLayout {
-                        Text("Carbs")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                // Show three small nutrient metrics: Protein, Carbs, Fat
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading) {
+                            Text("\(fmt(totalProteinToday)) g")
+                                .font(.title2)
+                                .bold()
+                            Text("Protein")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading) {
+                            Text("\(fmt(totalCarbsToday)) g")
+                                .font(.title2)
+                                .bold()
+                            Text("Carbs")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        VStack(alignment: .leading) {
+                            Text("\(fmt(totalFatToday)) g")
+                                .font(.title2)
+                                .bold()
+                            Text("Fat")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -331,20 +386,63 @@ struct ContentView: View {
             .accessibilityLabel("Daily calories")
             .accessibilityValue("\(totalCaloriesToday) of \(dailyCalorieGoal) calories")
 
-            if !compactLayout {
+            // Macro progress bars (always shown)
+            VStack(spacing: 8) {
+                // Protein
                 HStack {
-                    Text("All time:")
-                        .font(.footnote)
+                    Text("Protein")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text(allTimeText)
-                        .font(.footnote)
+                    Spacer()
+                    Text("\(fmt(totalProteinToday)) / \(dailyProteinGoal) g")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
                 }
+                ProgressView(value: min(totalProteinToday / Double(max(1, dailyProteinGoal)), 1.0))
+                    .accessibilityLabel("Protein")
+                    .accessibilityValue("\(fmt(totalProteinToday)) of \(dailyProteinGoal) grams")
+
+                // Carbs
+                HStack {
+                    Text("Carbs")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(fmt(totalCarbsToday)) / \(dailyCarbGoal) g")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(value: min(totalCarbsToday / Double(max(1, dailyCarbGoal)), 1.0))
+                    .accessibilityLabel("Carbohydrates")
+                    .accessibilityValue("\(fmt(totalCarbsToday)) of \(dailyCarbGoal) grams")
+
+                // Fat
+                HStack {
+                    Text("Fat")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(fmt(totalFatToday)) / \(dailyFatGoal) g")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                ProgressView(value: min(totalFatToday / Double(max(1, dailyFatGoal)), 1.0))
+                    .accessibilityLabel("Fat")
+                    .accessibilityValue("\(fmt(totalFatToday)) of \(dailyFatGoal) grams")
+            }
+
+            HStack {
+                Text("All time:")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text(allTimeText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
-        .padding(compactLayout ? 8 : 12)
+        .padding(12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.08)))
     }
@@ -372,17 +470,16 @@ struct ContentView: View {
             }
         }
         .listStyle(.plain)
-      //  .animation(.default, value: groupedEntries)
     }
 
     @ViewBuilder
     private func entryRow(_ entry: FoodEntry) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: compactLayout ? 4 : 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(entry.name)
-                    .font(compactLayout ? .subheadline : .headline)
+                    .font(.headline)
                 HStack(spacing: 8) {
-                    if let meal = entry.meal, !compactLayout {
+                    if let meal = entry.meal {
                         Label(meal.name, systemImage: "tray.full")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -399,7 +496,7 @@ struct ContentView: View {
             VStack(alignment: .trailing) {
                 Text("\(entry.calories) kcal")
                     .bold()
-                    .font(compactLayout ? .subheadline : .body)
+                    .font(.body)
                 HStack(spacing: 8) {
                     if let p = entry.protein {
                         Text("\(fmt(p)) g")
@@ -411,10 +508,15 @@ struct ContentView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                    if let f = entry.fat {
+                        Text("\(fmt(f)) g")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
-        .padding(.vertical, compactLayout ? 4 : 6)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
             selection = entry
@@ -469,18 +571,16 @@ struct ContentView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(meal.name)
-                                    .font(compactLayout ? .subheadline : .headline)
-                                if !compactLayout {
-                                    Text("\(meal.entries.count) items • \(meal.totalCalories) kcal")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                    .font(.headline)
+                                Text("\(meal.entries.count) items • \(meal.totalCalories) kcal • \(fmt(meal.totalFat)) g fat")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Text("\(meal.totalCalories) kcal")
                                 .bold()
                         }
-                        .padding(.vertical, compactLayout ? 4 : 6)
+                        .padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -549,6 +649,11 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let f = selected.fat {
+                Text("Fat: \(fmt(f)) g")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let code = selected.barcode {
                 Text("Barcode: \(code)")
                     .font(.caption2)
@@ -576,7 +681,7 @@ struct ContentView: View {
                     Text(meal.name)
                         .font(.largeTitle)
                         .bold()
-                    Text("\(meal.totalCalories) kcal • \(fmt(meal.totalProtein)) g P • \(fmt(meal.totalCarbs)) g C")
+                    Text("\(meal.totalCalories) kcal • \(fmt(meal.totalProtein)) g P • \(fmt(meal.totalCarbs)) g C • \(fmt(meal.totalFat)) g F")
                         .font(.title3)
                         .foregroundStyle(.primary)
                 }
@@ -620,6 +725,11 @@ struct ContentView: View {
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
+                                    if let f = item.fat {
+                                        Text("\(fmt(f)) g F")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
@@ -646,6 +756,7 @@ struct ContentView: View {
         calories: Int,
         protein: Double?,
         carbs: Double?,
+        fat: Double?,          // added fat param
         date: Date,
         servingSize: String?,
         servings: Double?,
@@ -657,12 +768,20 @@ struct ContentView: View {
                 calories: calories,
                 protein: protein,
                 carbs: carbs,
+                fat: fat,
                 timestamp: date,
                 servingSize: servingSize,
                 servings: servings,
                 barcode: barcode
             )
             modelContext.insert(newEntry)
+            // attempt explicit save during development to surface errors (optional)
+            do {
+                try modelContext.save()
+            } catch {
+                print("Warning: failed to save new entry: \(error)")
+            }
+
             selection = newEntry
             selectedMeal = nil
             viewMode = .entries

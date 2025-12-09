@@ -24,4 +24,7 @@ final class Meal: Identifiable {
     var totalCarbs: Double {
         entries.reduce(0.0) { $0 + ($1.carbs ?? 0.0) }
     }
+    var totalFat: Double {                                   // Added totalFat
+        entries.reduce(0.0) { $0 + ($1.fat ?? 0.0) }
+    }
 }

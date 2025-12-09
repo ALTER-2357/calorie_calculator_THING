@@ -1,20 +1,19 @@
-//
-//  SettingsView.swift
-//  calorie_calculator_THING
-//
-//  Created by lewis mills on 09/12/2025.
-//
-
-
 import SwiftUI
 
 struct SettingsView: View {
     // Bindings to AppStorage values in ContentView
     @Binding var dailyCalorieGoal: Int
-    @Binding var compactLayout: Bool
 
-    // Local temp value so we don't commit every stepper tick unless desired
+    // New macro goal bindings
+    @Binding var dailyProteinGoal: Int
+    @Binding var dailyCarbGoal: Int
+    @Binding var dailyFatGoal: Int
+
+    // Local temp values so we don't commit every stepper tick unless desired
     @State private var tempGoal: Int = 0
+    @State private var tempProtein: Int = 0
+    @State private var tempCarbs: Int = 0
+    @State private var tempFat: Int = 0
 
     private let minGoal = 800
     private let maxGoal = 6000
@@ -34,7 +33,7 @@ struct SettingsView: View {
                     Stepper(value: $tempGoal, in: minGoal...maxGoal, step: step) {
                         Text("Set goal: \(tempGoal) kcal")
                     }
-                    .onAppear { tempGoal = dailyCalorieGoal }
+                    .onAppear { tempGoal = dailyCalorieGoal; tempProtein = dailyProteinGoal; tempCarbs = dailyCarbGoal; tempFat = dailyFatGoal }
                     .onChange(of: tempGoal) { new in
                         // commit immediately — you can change this to only commit on Done if desired
                         dailyCalorieGoal = new
@@ -43,18 +42,55 @@ struct SettingsView: View {
                     Button("Reset to default (2000 kcal)") {
                         tempGoal = 2000
                         dailyCalorieGoal = 2000
+                        // also reset macros to sensible defaults
+                        tempProtein = 100
+                        tempCarbs = 250
+                        tempFat = 70
+                        dailyProteinGoal = 100
+                        dailyCarbGoal = 250
+                        dailyFatGoal = 70
                     }
                     .foregroundStyle(.blue)
                 }
 
-                Section(header: Text("Layout")) {
-                    Toggle(isOn: $compactLayout) {
-                        VStack(alignment: .leading) {
-                            Text("Compact layout")
-                            Text("Reduce spacing and text sizes for narrow or dense layouts")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                Section(header: Text("Macronutrient Goals")) {
+                    HStack {
+                        Text("Protein")
+                        Spacer()
+                        Text("\(dailyProteinGoal) g")
+                            .foregroundStyle(.secondary)
+                    }
+                    Stepper(value: $tempProtein, in: 0...500, step: 1) {
+                        Text("Protein: \(tempProtein) g")
+                    }
+                    .onChange(of: tempProtein) { new in
+                        dailyProteinGoal = new
+                    }
+
+                    HStack {
+                        Text("Carbs")
+                        Spacer()
+                        Text("\(dailyCarbGoal) g")
+                            .foregroundStyle(.secondary)
+                    }
+                    Stepper(value: $tempCarbs, in: 0...1000, step: 5) {
+                        Text("Carbs: \(tempCarbs) g")
+                    }
+                    .onChange(of: tempCarbs) { new in
+                        dailyCarbGoal = new
+                    }
+
+                    HStack {
+                        Text("Fat")
+                        Spacer()
+                        Text("\(dailyFatGoal) g")
+                            .foregroundStyle(.secondary)
+                    }
+                    Stepper(value: $tempFat, in: 0...300, step: 1) {
+                        Text("Fat: \(tempFat) g")
+                    }
+                    .onChange(of: tempFat) { new in
+                        dailyFatGoal = new
                     }
                 }
 
@@ -80,6 +116,11 @@ struct SettingsView: View {
 // Simple preview
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(dailyCalorieGoal: .constant(2000), compactLayout: .constant(false))
+        SettingsView(
+            dailyCalorieGoal: .constant(2000),
+            dailyProteinGoal: .constant(100),
+            dailyCarbGoal: .constant(250),
+            dailyFatGoal: .constant(70)
+        )
     }
 }

@@ -14,6 +14,7 @@ import SwiftData
 /// - initialSelectedIDs: useful to prefill (e.g. "make it a meal" from a single entry)
 /// - editingMeal: if non-nil, the view is in "edit" mode and will prefill with the meal's data
 /// - onSave: called with (mealName, chosenEntries, editingMeal). editingMeal is nil for creates.
+/// 
 struct AddMealView: View {
     @Environment(\.dismiss) private var dismiss
 
