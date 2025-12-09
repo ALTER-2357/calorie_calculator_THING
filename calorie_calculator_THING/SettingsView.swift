@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     // Bindings to AppStorage values in ContentView
@@ -14,6 +16,15 @@ struct SettingsView: View {
     @State private var tempProtein: Int = 0
     @State private var tempCarbs: Int = 0
     @State private var tempFat: Int = 0
+
+    // File export / import state
+    @State private var showingImporter = false
+    @State private var exportURL: URL? = nil
+    @State private var showingShareSheet = false
+    @State private var alertMessage: String? = nil
+    @State private var showingAlert = false
+
+    @Environment(\.modelContext) private var modelContext
 
     private let minGoal = 800
     private let maxGoal = 6000
@@ -33,7 +44,12 @@ struct SettingsView: View {
                     Stepper(value: $tempGoal, in: minGoal...maxGoal, step: step) {
                         Text("Set goal: \(tempGoal) kcal")
                     }
-                    .onAppear { tempGoal = dailyCalorieGoal; tempProtein = dailyProteinGoal; tempCarbs = dailyCarbGoal; tempFat = dailyFatGoal }
+                    .onAppear {
+                        tempGoal = dailyCalorieGoal
+                        tempProtein = dailyProteinGoal
+                        tempCarbs = dailyCarbGoal
+                        tempFat = dailyFatGoal
+                    }
                     .onChange(of: tempGoal) { new in
                         // commit immediately — you can change this to only commit on Done if desired
                         dailyCalorieGoal = new
@@ -94,6 +110,39 @@ struct SettingsView: View {
                     }
                 }
 
+                // New section for backup/export/import
+                Section(header: Text("Backup & Export")) {
+                    Button {
+                        doExport()
+                    } label: {
+                        Label("Export backup (JSON)", systemImage: "square.and.arrow.up")
+                    }
+
+                    Button {
+                        showingImporter = true
+                    } label: {
+                        Label("Import backup", systemImage: "square.and.arrow.down")
+                    }
+                    .fileImporter(
+                        isPresented: $showingImporter,
+                        allowedContentTypes: [UTType.json],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        switch result {
+                        case .success(let urls):
+                            guard let url = urls.first else { return }
+                            importBackup(from: url)
+                        case .failure(let error):
+                            alertMessage = "Failed to open file: \(error.localizedDescription)"
+                            showingAlert = true
+                        }
+                    }
+
+                    Text("Export creates a JSON file containing your entries and meals. Use 'Import' to restore or merge from a previously exported file.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Section(header: Text("About")) {
                     Text("Settings are saved automatically.")
                         .font(.caption)
@@ -104,11 +153,55 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        // iOS/macOS will dismiss via parent sheet binding
-                        // Nothing to do here — parent controls dismissal.
+                        // Parent sheet dismisses; nothing else to do here.
                     }
                 }
             }
+            .alert(isPresented: $showingAlert) {
+                Alert(title: Text("Backup"), message: Text(alertMessage ?? ""), dismissButton: .default(Text("OK")))
+            }
+            // Present share sheet when we have an export url
+            .sheet(isPresented: $showingShareSheet, onDismiss: {
+                // remove temp file if needed
+                if let url = exportURL {
+                    try? FileManager.default.removeItem(at: url)
+                    exportURL = nil
+                }
+            }) {
+                if let url = exportURL {
+                    #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
+                    ShareSheet(activityItems: [url])
+                        .edgesIgnoringSafeArea(.all)
+                    #else
+                    // macOS share sheet wrapper
+                    ShareSheet(items: [url])
+                    #endif
+                } else {
+                    Text("Preparing export...")
+                }
+            }
+        }
+    }
+
+    private func doExport() {
+        do {
+            let fileURL = try BackupManager.createBackupFile(from: modelContext)
+            exportURL = fileURL
+            showingShareSheet = true
+        } catch {
+            alertMessage = "Export failed: \(error.localizedDescription)"
+            showingAlert = true
+        }
+    }
+
+    private func importBackup(from url: URL) {
+        do {
+            let (entriesImported, mealsImported) = try BackupManager.importBackup(from: url, into: modelContext)
+            alertMessage = "Imported \(entriesImported) entries and \(mealsImported) meals."
+            showingAlert = true
+        } catch {
+            alertMessage = "Import failed: \(error.localizedDescription)"
+            showingAlert = true
         }
     }
 }

@@ -1,4 +1,12 @@
 //
+//  ScannerError.swift
+//  calorie_calculator_THING
+//
+//  Created by lewis mills on 09/12/2025.
+//
+
+
+//
 //  BarcodeScannerView.swift
 //  calorie_calculator_THING
 //
@@ -10,8 +18,6 @@
  
 import SwiftUI
 import AVFoundation
-import UIKit
-import AudioToolbox
  
 enum ScannerError: Error {
     case permissionDenied
@@ -186,15 +192,6 @@ final class ScannerViewController: UIViewController, AVCaptureMetadataOutputObje
         for metadata in metadataObjects {
             if let readable = metadata as? AVMetadataMachineReadableCodeObject,
                let string = readable.stringValue {
-                // Provide haptic + tone feedback for successful detection
-                // Haptic
-                let haptic = UINotificationFeedbackGenerator()
-                haptic.prepare()
-                haptic.notificationOccurred(.success)
-                // Tone (system click). You can change the sound ID to another system sound if desired.
-                let soundID: SystemSoundID = 1057
-                AudioServicesPlaySystemSound(soundID)
- 
                 // Found first valid code; stop scanning and notify
                 stopRunning()
                 delegate?.scanner(self, didFindCode: string)

@@ -383,6 +383,7 @@ struct ContentView: View {
                 Text("\(totalCaloriesToday)/\(dailyCalorieGoal) kcal")
                     .font(.caption2)
             }
+
             .accessibilityLabel("Daily calories")
             .accessibilityValue("\(totalCaloriesToday) of \(dailyCalorieGoal) calories")
 
