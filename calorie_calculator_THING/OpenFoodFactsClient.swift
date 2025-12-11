@@ -24,8 +24,16 @@ struct OFFProductInfo {
     let proteinsPerServing: Double?
     /// carbs grams per serving if available
     let carbsPerServing: Double?
-    /// fat grams per serving if available (NEW)
+    /// fat grams per serving if available
     let fatPerServing: Double?
+    /// calories per 100 g if available
+    let caloriesPer100g: Double?
+    /// protein per 100 g if available
+    let proteinsPer100g: Double?
+    /// carbs per 100 g if available
+    let carbsPer100g: Double?
+    /// fat per 100 g if available
+    let fatPer100g: Double?
     /// human readable serving size, e.g. "1 slice (30 g)"
     let servingSize: String?
     let barcode: String
@@ -76,7 +84,7 @@ final class OpenFoodFactsClient {
             let carbohydrates_serving: Double?
             let carbohydrates_100g: Double?
 
-            // fat keys (added)
+            // fat keys
             let fat_serving: Double?
             let fat_100g: Double?
 
@@ -95,9 +103,10 @@ final class OpenFoodFactsClient {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
 
                 func decodeDouble(_ key: CodingKeys) -> Double? {
+                    // Try Double then String
                     if let d = try? container.decodeIfPresent(Double.self, forKey: key) { return d }
                     if let s = try? container.decodeIfPresent(String.self, forKey: key) {
-                        let cleaned = s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
+                        let cleaned = s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
                         return Double(cleaned)
                     }
                     return nil
@@ -131,12 +140,22 @@ final class OpenFoodFactsClient {
         var carbsPerServing: Double? = nil
         var fatPerServing: Double? = nil
 
+        var caloriesPer100g: Double? = nil
+        var proteinsPer100g: Double? = nil
+        var carbsPer100g: Double? = nil
+        var fatPer100g: Double? = nil
+
         if let n = product.nutriments {
-            // Prefer per-serving values; fall back to per-100g if present.
-            caloriesPerServing = n.energy_kcal_serving ?? n.energy_kcal_100g
-            proteinsPerServing = n.proteins_serving ?? n.proteins_100g
-            carbsPerServing = n.carbohydrates_serving ?? n.carbohydrates_100g
-            fatPerServing = n.fat_serving ?? n.fat_100g
+            // Assign each value from its exact JSON key. Don't conflate per-serving and per-100g.
+            caloriesPerServing = n.energy_kcal_serving
+            proteinsPerServing = n.proteins_serving
+            carbsPerServing = n.carbohydrates_serving
+            fatPerServing = n.fat_serving
+
+            caloriesPer100g = n.energy_kcal_100g
+            proteinsPer100g = n.proteins_100g
+            carbsPer100g = n.carbohydrates_100g
+            fatPer100g = n.fat_100g
         }
 
         let servingSize = product.serving_size
@@ -147,6 +166,10 @@ final class OpenFoodFactsClient {
             proteinsPerServing: proteinsPerServing,
             carbsPerServing: carbsPerServing,
             fatPerServing: fatPerServing,
+            caloriesPer100g: caloriesPer100g,
+            proteinsPer100g: proteinsPer100g,
+            carbsPer100g: carbsPer100g,
+            fatPer100g: fatPer100g,
             servingSize: servingSize,
             barcode: trimmed
         )
