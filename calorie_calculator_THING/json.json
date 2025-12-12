@@ -1,5 +1,16 @@
 {
   "data": [
+      {
+        "name": "Whole milk",
+        "summary": null,
+        "ingredients": "",
+        "calories": 132,
+        "fat": 7.4,
+        "carbohydrates": 9.4,
+        "fibre": 0,
+        "protein": 27,
+        "salt": 0
+      },
     {
       "name": "Jacket potato with cheese",
       "summary": null,
